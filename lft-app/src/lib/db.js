@@ -134,6 +134,15 @@ export function deleteTag(id) {
   return result.changes > 0;
 }
 
+/**
+ * Aggiorna l'etichetta di un tag
+ */
+export function updateTag(id, newLabel) {
+  const stmt = db.prepare("UPDATE tags SET label = ? WHERE id = ?");
+  const result = stmt.run(newLabel, id);
+  return result.changes > 0;
+}
+
 // ==================== FUNZIONI PER FILES ====================
 
 /**

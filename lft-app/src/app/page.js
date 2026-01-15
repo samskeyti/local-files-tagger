@@ -30,6 +30,8 @@ export default function Home() {
   const [availableTags, setAvailableTags] = useState([]);
   const [loadingTags, setLoadingTags] = useState(false);
   const [newTagLabel, setNewTagLabel] = useState("");
+  const [editingTagId, setEditingTagId] = useState(null);
+  const [editingTagLabel, setEditingTagLabel] = useState("");
 
   // Carica il percorso iniziale dalla configurazione
   useEffect(() => {
@@ -207,6 +209,49 @@ export default function Home() {
     }
   };
 
+  const startEditingTag = (tag) => {
+    setEditingTagId(tag.id);
+    setEditingTagLabel(tag.label);
+  };
+
+  const saveTagEdit = async () => {
+    if (!editingTagId) return;
+
+    const type = isImageFile(selectedFile.name) ? "image" : "text";
+
+    try {
+      const response = await fetch("/api/tags", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          tagId: editingTagId,
+          label: editingTagLabel.trim(),
+        }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        setEditingTagId(null);
+        setEditingTagLabel("");
+
+        // Se il tag è stato cancellato, ricarica anche i tag del file
+        if (data.deleted) {
+          loadFileTags(selectedFile.path);
+        }
+
+        loadAvailableTags(type);
+      }
+    } catch (err) {
+      console.error("Error updating tag:", err);
+    }
+  };
+
+  const cancelEditingTag = () => {
+    setEditingTagId(null);
+    setEditingTagLabel("");
+  };
+
   const handleFileClick = async (item) => {
     if (item.isDirectory) {
       loadFolder(item.path);
@@ -214,19 +259,13 @@ export default function Home() {
       setSelectedFile(item);
       setTextContent("");
       setLoadingTags(true);
-      await Promise.all([
-        loadFileTags(item.path),
-        loadAvailableTags("image")
-      ]);
+      await Promise.all([loadFileTags(item.path), loadAvailableTags("image")]);
       setLoadingTags(false);
     } else if (isTextFile(item.name)) {
       setSelectedFile(item);
       loadTextFile(item.path);
       setLoadingTags(true);
-      await Promise.all([
-        loadFileTags(item.path),
-        loadAvailableTags("text")
-      ]);
+      await Promise.all([loadFileTags(item.path), loadAvailableTags("text")]);
       setLoadingTags(false);
     }
   };
@@ -271,7 +310,7 @@ export default function Home() {
     setLoadingTags(true);
     await Promise.all([
       loadFileTags(nextFile.path),
-      loadAvailableTags(fileType)
+      loadAvailableTags(fileType),
     ]);
     setLoadingTags(false);
   };
@@ -363,7 +402,7 @@ export default function Home() {
                     setLoadingTags(true);
                     await Promise.all([
                       loadFileTags(imageFiles[0].path),
-                      loadAvailableTags("image")
+                      loadAvailableTags("image"),
                     ]);
                     setLoadingTags(false);
                   }
@@ -395,7 +434,7 @@ export default function Home() {
                     setLoadingTags(true);
                     await Promise.all([
                       loadFileTags(textFiles[0].path),
-                      loadAvailableTags("text")
+                      loadAvailableTags("text"),
                     ]);
                     setLoadingTags(false);
                   }
@@ -662,16 +701,56 @@ export default function Home() {
 
                         return sortedTags.map((tag) => {
                           const isChecked = fileTagIds.includes(tag.id);
+                          const isEditing = editingTagId === tag.id;
+
                           return (
-                            <Checkbox
+                            <div
                               key={tag.id}
-                              label={tag.label}
-                              checked={isChecked}
-                              onChange={(e) =>
-                                toggleTag(tag.id, e.currentTarget.checked)
-                              }
-                              size="sm"
-                            />
+                              style={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: "8px",
+                              }}
+                            >
+                              <Checkbox
+                                checked={isChecked}
+                                onChange={(e) =>
+                                  toggleTag(tag.id, e.currentTarget.checked)
+                                }
+                                size="sm"
+                                disabled={isEditing}
+                              />
+                              {isEditing ? (
+                                <TextInput
+                                  value={editingTagLabel}
+                                  onChange={(e) =>
+                                    setEditingTagLabel(e.currentTarget.value)
+                                  }
+                                  onKeyDown={(e) => {
+                                    if (e.key === "Enter") {
+                                      saveTagEdit();
+                                    } else if (e.key === "Escape") {
+                                      cancelEditingTag();
+                                    }
+                                  }}
+                                  onBlur={saveTagEdit}
+                                  size="xs"
+                                  style={{ flex: 1 }}
+                                  autoFocus
+                                />
+                              ) : (
+                                <Text
+                                  size="sm"
+                                  style={{
+                                    flex: 1,
+                                    cursor: "pointer",
+                                  }}
+                                  onClick={() => startEditingTag(tag)}
+                                >
+                                  {tag.label}
+                                </Text>
+                              )}
+                            </div>
                           );
                         });
                       })()

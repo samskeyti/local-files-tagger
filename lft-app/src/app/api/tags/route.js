@@ -4,6 +4,7 @@ import {
   getAllTags,
   getTagById,
   deleteTag,
+  updateTag,
   getTagsForFile,
   addTagToFile,
   removeTagFromFile,
@@ -53,6 +54,39 @@ export async function POST(request) {
         success,
         message: success ? "Tag added to file" : "Tag already exists on file",
       });
+    } else {
+      return NextResponse.json(
+        { error: "Invalid parameters" },
+        { status: 400 }
+      );
+    }
+  } catch (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+}
+
+// PUT - Aggiorna un tag
+export async function PUT(request) {
+  try {
+    const body = await request.json();
+
+    if (body.tagId && body.label !== undefined) {
+      // Se la label è "-", elimina il tag
+      if (body.label === "-") {
+        const success = deleteTag(body.tagId);
+        return NextResponse.json({
+          success,
+          deleted: true,
+          message: success ? "Tag deleted" : "Tag not found",
+        });
+      } else {
+        // Altrimenti aggiorna la label
+        const success = updateTag(body.tagId, body.label);
+        return NextResponse.json({
+          success,
+          message: success ? "Tag updated" : "Tag not found",
+        });
+      }
     } else {
       return NextResponse.json(
         { error: "Invalid parameters" },
