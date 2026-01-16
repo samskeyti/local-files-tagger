@@ -1,10 +1,50 @@
 import { NextResponse } from "next/server";
 import fs from "fs";
 import path from "path";
+import { getFilesForTag } from "@/lib/db";
 
 export async function GET(request) {
   const { searchParams } = new URL(request.url);
   const folderPath = searchParams.get("path");
+  const tagId = searchParams.get("tagId");
+
+  // Se viene passato tagId, restituisci i file che hanno quel tag
+  if (tagId) {
+    try {
+      const files = getFilesForTag(parseInt(tagId));
+
+      // Costruisci la struttura simile a quella dei file in una cartella
+      const itemsWithInfo = files.map((file) => {
+        const fullPath = path.join(file.folder, file.filename);
+        try {
+          const stats = fs.statSync(fullPath);
+          return {
+            name: file.filename,
+            isDirectory: false,
+            path: fullPath,
+            size: stats.size,
+            modified: stats.mtime,
+            folder: file.folder, // Per visualizzare il percorso
+          };
+        } catch (error) {
+          return {
+            name: file.filename,
+            isDirectory: false,
+            path: fullPath,
+            folder: file.folder,
+            error: "Cannot access",
+          };
+        }
+      });
+
+      // Ordina per nome
+      itemsWithInfo.sort((a, b) => a.name.localeCompare(b.name));
+
+      return NextResponse.json({ items: itemsWithInfo });
+    } catch (error) {
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+  }
 
   if (!folderPath) {
     return NextResponse.json(

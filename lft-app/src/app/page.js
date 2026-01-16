@@ -10,6 +10,8 @@ import {
   Loader,
   Alert,
   Checkbox,
+  Tabs,
+  Select,
 } from "@mantine/core";
 import {
   IconFolder,
@@ -20,7 +22,10 @@ import {
 } from "@tabler/icons-react";
 
 export default function Home() {
+  const [activeTab, setActiveTab] = useState("folder");
   const [folderPath, setFolderPath] = useState("");
+  const [selectedTagFilter, setSelectedTagFilter] = useState(null);
+  const [allTagsForFilter, setAllTagsForFilter] = useState([]);
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -44,7 +49,45 @@ export default function Home() {
         }
       })
       .catch((err) => console.error("Error loading config:", err));
+
+    // Carica tutti i tag per il filtro
+    loadAllTagsForFilter();
   }, []);
+
+  const loadAllTagsForFilter = async () => {
+    try {
+      const response = await fetch("/api/tags");
+      const data = await response.json();
+      console.log("Tags loaded for filter:", data);
+      if (response.ok) {
+        setAllTagsForFilter(data.tags || []);
+      }
+    } catch (err) {
+      console.error("Error loading tags for filter:", err);
+    }
+  };
+
+  const loadFilesByTag = async (tagId) => {
+    setLoading(true);
+    setError(null);
+    setSelectedFile(null);
+    setTextContent("");
+    try {
+      const response = await fetch(`/api/files?tagId=${tagId}`);
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Errore nel caricamento dei file");
+      }
+
+      setItems(data.items || []);
+    } catch (err) {
+      setError(err.message);
+      setItems([]);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const loadFolder = async (path) => {
     setLoading(true);
@@ -253,8 +296,11 @@ export default function Home() {
   };
 
   const handleFileClick = async (item) => {
+    // In modalità tag, non permettere navigazione in directory
     if (item.isDirectory) {
-      loadFolder(item.path);
+      if (activeTab === "folder") {
+        loadFolder(item.path);
+      }
     } else if (isImageFile(item.name)) {
       setSelectedFile(item);
       setTextContent("");
@@ -345,15 +391,56 @@ export default function Home() {
       gap="md"
       style={{ height: "100vh", backgroundColor: "white" }}
     >
-      {/* Campo percorso in alto */}
-      <TextInput
-        label="Percorso folder"
-        placeholder="Inserisci il percorso della cartella"
-        value={folderPath}
-        onChange={(e) => handlePathChange(e.currentTarget.value)}
-        onKeyDown={handlePathSubmit}
-        size="md"
-      />
+      {/* Tabs per scegliere modalità di visualizzazione */}
+      <Tabs value={activeTab} onChange={(value) => {
+        setActiveTab(value);
+        setSelectedFile(null);
+        setTextContent("");
+        setItems([]);
+        // Quando si torna al tab folder, ricarica la cartella corrente
+        if (value === "folder" && folderPath) {
+          loadFolder(folderPath);
+        }
+      }}>
+        <Tabs.List>
+          <Tabs.Tab value="folder">Percorso folder</Tabs.Tab>
+          <Tabs.Tab value="tag">Tag</Tabs.Tab>
+        </Tabs.List>
+
+        <Tabs.Panel value="folder" pt="sm">
+          <TextInput
+            placeholder="Inserisci il percorso della cartella"
+            value={folderPath}
+            onChange={(e) => handlePathChange(e.currentTarget.value)}
+            onKeyDown={handlePathSubmit}
+            size="md"
+          />
+        </Tabs.Panel>
+
+        <Tabs.Panel value="tag" pt="sm">
+          <Select
+            placeholder="Seleziona un tag per filtrare i file"
+            value={selectedTagFilter}
+            onChange={(value) => {
+              setSelectedTagFilter(value);
+              if (value) {
+                loadFilesByTag(value);
+              } else {
+                setItems([]);
+                setSelectedFile(null);
+              }
+            }}
+            data={allTagsForFilter.map((tag) => ({
+              value: tag.id.toString(),
+              label: `${tag.label} (${tag.type}) - ${tag.count} file`,
+            }))}
+            searchable
+            clearable
+            size="md"
+            nothingFoundMessage="Nessun tag disponibile - crea dei tag prima di usare questa funzione"
+          />
+        </Tabs.Panel>
+      </Tabs>
 
       {/* Tre colonne */}
       <div
@@ -480,30 +567,34 @@ export default function Home() {
           {!loading && !error && (
             <ScrollArea style={{ flex: 1, minHeight: 0 }} type="auto">
               <Stack gap="xs">
-                {/* Cartella parent */}
-                <Paper
-                  p="xs"
-                  withBorder
-                  style={{ cursor: "pointer" }}
-                  onClick={goToParentFolder}
-                >
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "8px",
-                    }}
+                {/* Cartella parent - solo in modalità folder */}
+                {activeTab === "folder" && (
+                  <Paper
+                    p="xs"
+                    withBorder
+                    style={{ cursor: "pointer" }}
+                    onClick={goToParentFolder}
                   >
-                    <IconFolder size={20} color="#4A90E2" />
-                    <Text size="sm" style={{ flex: 1 }}>
-                      ..
-                    </Text>
-                  </div>
-                </Paper>
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "8px",
+                      }}
+                    >
+                      <IconFolder size={20} color="#4A90E2" />
+                      <Text size="sm" style={{ flex: 1 }}>
+                        ..
+                      </Text>
+                    </div>
+                  </Paper>
+                )}
 
                 {items.length === 0 ? (
                   <Text c="dimmed" size="sm">
-                    Nessun file o cartella trovato
+                    {activeTab === "tag" 
+                      ? "Nessun file trovato per questo tag"
+                      : "Nessun file o cartella trovato"}
                   </Text>
                 ) : (
                   items.map((item, index) => (
@@ -530,12 +621,23 @@ export default function Home() {
                         ) : (
                           <IconFile size={20} color="#888" />
                         )}
-                        <Text
-                          size="sm"
-                          style={{ flex: 1, wordBreak: "break-all" }}
-                        >
-                          {item.name}
-                        </Text>
+                        <div style={{ flex: 1 }}>
+                          <Text
+                            size="sm"
+                            style={{ wordBreak: "break-all" }}
+                          >
+                            {item.name}
+                          </Text>
+                          {activeTab === "tag" && item.folder && (
+                            <Text
+                              size="xs"
+                              c="dimmed"
+                              style={{ wordBreak: "break-all" }}
+                            >
+                              {item.folder}
+                            </Text>
+                          )}
+                        </div>
                       </div>
                     </Paper>
                   ))
