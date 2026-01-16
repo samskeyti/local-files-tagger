@@ -20,6 +20,7 @@ import {
   IconPhoto,
   IconFileText,
 } from "@tabler/icons-react";
+import ReactMarkdown from "react-markdown";
 
 export default function Home() {
   const [activeTab, setActiveTab] = useState("folder");
@@ -704,21 +705,34 @@ export default function Home() {
             </div>
           ) : selectedFile && isTextFile(selectedFile.name) ? (
             <ScrollArea style={{ flex: 1, minHeight: 0 }} type="auto">
-              <pre
-                style={{
-                  fontFamily: "monospace",
-                  fontSize: "14px",
-                  whiteSpace: "pre-wrap",
-                  wordBreak: "break-word",
-                  margin: 0,
-                  padding: "1rem",
-                  backgroundColor: "#f5f5f5",
-                  borderRadius: "4px",
-                  border: "1px solid #ddd",
-                }}
-              >
-                {textContent}
-              </pre>
+              {selectedFile.name.toLowerCase().endsWith(".md") ? (
+                <div
+                  style={{
+                    padding: "1rem",
+                    backgroundColor: "#f5f5f5",
+                    borderRadius: "4px",
+                    border: "1px solid #ddd",
+                  }}
+                >
+                  <ReactMarkdown>{textContent}</ReactMarkdown>
+                </div>
+              ) : (
+                <pre
+                  style={{
+                    fontFamily: "monospace",
+                    fontSize: "14px",
+                    whiteSpace: "pre-wrap",
+                    wordBreak: "break-word",
+                    margin: 0,
+                    padding: "1rem",
+                    backgroundColor: "#f5f5f5",
+                    borderRadius: "4px",
+                    border: "1px solid #ddd",
+                  }}
+                >
+                  {textContent}
+                </pre>
+              )}
             </ScrollArea>
           ) : (
             <Text c="dimmed" size="sm">
