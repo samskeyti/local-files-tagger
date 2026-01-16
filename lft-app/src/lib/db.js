@@ -26,6 +26,7 @@ function initDatabase() {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       type TEXT NOT NULL,
       label TEXT NOT NULL,
+      count INTEGER DEFAULT 0,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       UNIQUE(type, label)
     )
@@ -78,6 +79,13 @@ function initDatabase() {
   db.exec(`
     CREATE INDEX IF NOT EXISTS idx_files_tags_tagId ON files_tags(tagId)
   `);
+
+  // Aggiungi colonna count se non esiste (per database esistenti)
+  try {
+    db.exec(`ALTER TABLE tags ADD COLUMN count INTEGER DEFAULT 0`);
+  } catch (err) {
+    // La colonna esiste già, ignora l'errore
+  }
 }
 
 // Inizializza il database
@@ -226,6 +234,17 @@ export function addTagToFile(filePath, tagId) {
     "INSERT OR IGNORE INTO files_tags (fileId, tagId) VALUES (?, ?)"
   );
   const result = stmt.run(fileId, tagId);
+
+  // Se il tag è stato effettivamente aggiunto, aggiorna il count
+  if (result.changes > 0) {
+    const countStmt = db.prepare(`
+      UPDATE tags 
+      SET count = (SELECT COUNT(*) FROM files_tags WHERE tagId = ?) 
+      WHERE id = ?
+    `);
+    countStmt.run(tagId, tagId);
+  }
+
   return result.changes > 0;
 }
 
@@ -240,6 +259,17 @@ export function removeTagFromFile(filePath, tagId) {
     "DELETE FROM files_tags WHERE fileId = ? AND tagId = ?"
   );
   const result = stmt.run(file.id, tagId);
+
+  // Se il tag è stato effettivamente rimosso, aggiorna il count
+  if (result.changes > 0) {
+    const countStmt = db.prepare(`
+      UPDATE tags 
+      SET count = (SELECT COUNT(*) FROM files_tags WHERE tagId = ?) 
+      WHERE id = ?
+    `);
+    countStmt.run(tagId, tagId);
+  }
+
   return result.changes > 0;
 }
 

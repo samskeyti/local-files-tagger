@@ -682,7 +682,13 @@ export default function Home() {
                 </div>
               ) : (
                 <ScrollArea style={{ flex: 1, minHeight: 0 }} type="auto">
-                  <Stack gap="xs">
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "1fr 1fr",
+                      gap: "8px",
+                    }}
+                  >
                     {availableTags.length === 0 ? (
                       <Text c="dimmed" size="sm">
                         Nessun tag disponibile per questo tipo di file
@@ -747,7 +753,7 @@ export default function Home() {
                                   }}
                                   onClick={() => startEditingTag(tag)}
                                 >
-                                  {tag.label}
+                                  {tag.label} {tag.count > 0 && `(${tag.count})`}
                                 </Text>
                               )}
                             </div>
@@ -755,7 +761,7 @@ export default function Home() {
                         });
                       })()
                     )}
-                  </Stack>
+                  </div>
                 </ScrollArea>
               )}
             </>
