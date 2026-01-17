@@ -11,7 +11,7 @@ import {
   Alert,
   Checkbox,
   Tabs,
-  Select,
+  MultiSelect,
 } from "@mantine/core";
 import {
   IconFolder,
@@ -25,7 +25,7 @@ import ReactMarkdown from "react-markdown";
 export default function Home() {
   const [activeTab, setActiveTab] = useState("folder");
   const [folderPath, setFolderPath] = useState("");
-  const [selectedTagFilter, setSelectedTagFilter] = useState(null);
+  const [selectedTagFilter, setSelectedTagFilter] = useState([]);
   const [allTagsForFilter, setAllTagsForFilter] = useState([]);
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -68,13 +68,13 @@ export default function Home() {
     }
   };
 
-  const loadFilesByTag = async (tagId) => {
+  const loadFilesByTag = async (tagIds) => {
     setLoading(true);
     setError(null);
     setSelectedFile(null);
     setTextContent("");
     try {
-      const response = await fetch(`/api/files?tagId=${tagId}`);
+      const response = await fetch(`/api/files?tagIds=${tagIds.join(',')}`);
       const data = await response.json();
 
       if (!response.ok) {
@@ -393,55 +393,57 @@ export default function Home() {
       style={{ height: "100vh", backgroundColor: "white" }}
     >
       {/* Tabs per scegliere modalità di visualizzazione */}
-      <Tabs value={activeTab} onChange={(value) => {
-        setActiveTab(value);
-        setSelectedFile(null);
-        setTextContent("");
-        setItems([]);
-        // Quando si torna al tab folder, ricarica la cartella corrente
-        if (value === "folder" && folderPath) {
-          loadFolder(folderPath);
-        }
-      }}>
-        <Tabs.List>
-          <Tabs.Tab value="folder">Percorso folder</Tabs.Tab>
-          <Tabs.Tab value="tag">Tag</Tabs.Tab>
-        </Tabs.List>
+      <div style={{ maxWidth: "calc((100% - 2rem) / 4)" }}>
+        <Tabs value={activeTab} onChange={(value) => {
+          setActiveTab(value);
+          setSelectedFile(null);
+          setTextContent("");
+          setItems([]);
+          // Quando si torna al tab folder, ricarica la cartella corrente
+          if (value === "folder" && folderPath) {
+            loadFolder(folderPath);
+          }
+        }}>
+          <Tabs.List>
+            <Tabs.Tab value="folder">Percorso folder</Tabs.Tab>
+            <Tabs.Tab value="tag">Tag</Tabs.Tab>
+          </Tabs.List>
 
-        <Tabs.Panel value="folder" pt="sm">
-          <TextInput
-            placeholder="Inserisci il percorso della cartella"
-            value={folderPath}
-            onChange={(e) => handlePathChange(e.currentTarget.value)}
-            onKeyDown={handlePathSubmit}
-            size="md"
-          />
-        </Tabs.Panel>
+          <Tabs.Panel value="folder" pt="sm">
+            <TextInput
+              placeholder="Inserisci il percorso della cartella"
+              value={folderPath}
+              onChange={(e) => handlePathChange(e.currentTarget.value)}
+              onKeyDown={handlePathSubmit}
+              size="md"
+            />
+          </Tabs.Panel>
 
-        <Tabs.Panel value="tag" pt="sm">
-          <Select
-            placeholder="Seleziona un tag per filtrare i file"
-            value={selectedTagFilter}
-            onChange={(value) => {
-              setSelectedTagFilter(value);
-              if (value) {
-                loadFilesByTag(value);
-              } else {
-                setItems([]);
-                setSelectedFile(null);
-              }
-            }}
-            data={allTagsForFilter.map((tag) => ({
-              value: tag.id.toString(),
-              label: `${tag.label} (${tag.type}) - ${tag.count} file`,
-            }))}
-            searchable
-            clearable
-            size="md"
-            nothingFoundMessage="Nessun tag disponibile - crea dei tag prima di usare questa funzione"
-          />
-        </Tabs.Panel>
-      </Tabs>
+          <Tabs.Panel value="tag" pt="sm">
+            <MultiSelect
+              placeholder="Seleziona uno o più tag per filtrare i file"
+              value={selectedTagFilter}
+              onChange={(value) => {
+                setSelectedTagFilter(value);
+                if (value && value.length > 0) {
+                  loadFilesByTag(value);
+                } else {
+                  setItems([]);
+                  setSelectedFile(null);
+                }
+              }}
+              data={allTagsForFilter.map((tag) => ({
+                value: tag.id.toString(),
+                label: `${tag.label} (${tag.type}) - ${tag.count} file`,
+              }))}
+              searchable
+              clearable
+              size="md"
+              nothingFoundMessage="Nessun tag disponibile - crea dei tag prima di usare questa funzione"
+            />
+          </Tabs.Panel>
+        </Tabs>
+      </div>
 
       {/* Tre colonne */}
       <div

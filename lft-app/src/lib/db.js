@@ -303,6 +303,38 @@ export function getFilesForTag(tagId) {
 }
 
 /**
+ * Ottieni tutti i file che hanno TUTTI i tag specificati
+ */
+export function getFilesForAllTags(tagIds) {
+  if (!Array.isArray(tagIds) || tagIds.length === 0) {
+    return [];
+  }
+
+  // Se c'è solo un tag, usa la funzione esistente
+  if (tagIds.length === 1) {
+    return getFilesForTag(tagIds[0]);
+  }
+
+  // Crea placeholders per i tag (?, ?, ?)
+  const placeholders = tagIds.map(() => "?").join(",");
+
+  // Query che trova i file che hanno TUTTI i tag specificati
+  const stmt = db.prepare(`
+    SELECT f.* FROM files f
+    WHERE (
+      SELECT COUNT(DISTINCT ft.tagId)
+      FROM files_tags ft
+      WHERE ft.fileId = f.id
+        AND ft.tagId IN (${placeholders})
+    ) = ?
+    ORDER BY f.folder, f.filename
+  `);
+
+  // Passa i tagIds e poi il count atteso
+  return stmt.all(...tagIds, tagIds.length);
+}
+
+/**
  * Ottieni tutti i file con i loro tag
  */
 export function getAllFilesWithTags() {
