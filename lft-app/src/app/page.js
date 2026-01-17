@@ -12,6 +12,7 @@ import {
   Checkbox,
   Tabs,
   MultiSelect,
+  Rating,
 } from "@mantine/core";
 import {
   IconFolder,
@@ -38,6 +39,7 @@ export default function Home() {
   const [newTagLabel, setNewTagLabel] = useState("");
   const [editingTagId, setEditingTagId] = useState(null);
   const [editingTagLabel, setEditingTagLabel] = useState("");
+  const [fileRating, setFileRating] = useState(0);
 
   // Carica il percorso iniziale dalla configurazione
   useEffect(() => {
@@ -176,10 +178,67 @@ export default function Home() {
       const data = await response.json();
 
       if (response.ok) {
-        setFileTags(data.tags || []);
+        const tags = data.tags || [];
+        setFileTags(tags);
+        
+        // Carica il rating se esiste
+        const ratingTag = tags.find(tag => tag.type === "rating");
+        setFileRating(ratingTag ? parseInt(ratingTag.label) : 0);
       }
     } catch (err) {
       console.error("Error loading tags:", err);
+    }
+  };
+
+  const handleRatingChange = async (value) => {
+    if (!selectedFile) return;
+
+    setFileRating(value);
+
+    try {
+      // Rimuovi tutti i rating precedenti se esistono
+      const oldRatingTags = fileTags.filter(tag => tag.type === "rating");
+      for (const oldRatingTag of oldRatingTags) {
+        await fetch("/api/tags", {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            filePath: selectedFile.path,
+            tagId: oldRatingTag.id,
+          }),
+        });
+      }
+
+      if (value > 0) {
+        // Crea o ottieni il tag rating
+        const createResponse = await fetch("/api/tags", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            type: "rating",
+            label: value.toString(),
+          }),
+        });
+
+        const createData = await createResponse.json();
+        if (createResponse.ok && createData.tag) {
+          // Associa il tag al file
+          await fetch("/api/tags", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              filePath: selectedFile.path,
+              tagId: createData.tag.id,
+            }),
+          });
+        }
+      }
+
+      // Ricarica i tag
+      await loadFileTags(selectedFile.path);
+      await loadAllTagsForFilter();
+    } catch (err) {
+      console.error("Error updating rating:", err);
     }
   };
 
@@ -189,7 +248,9 @@ export default function Home() {
       const data = await response.json();
 
       if (response.ok) {
-        setAvailableTags(data.tags || []);
+        // Escludi i tag di tipo "rating" dalla lista
+        const tags = (data.tags || []).filter(tag => tag.type !== "rating");
+        setAvailableTags(tags);
       }
     } catch (err) {
       console.error("Error loading available tags:", err);
@@ -432,10 +493,26 @@ export default function Home() {
                   setSelectedFile(null);
                 }
               }}
-              data={allTagsForFilter.map((tag) => ({
-                value: tag.id.toString(),
-                label: `${tag.label} (${tag.type}) - ${tag.count} file`,
-              }))}
+              data={allTagsForFilter
+                .sort((a, b) => {
+                  // Ordina alfabeticamente per label
+                  return a.label.localeCompare(b.label);
+                })
+                .map((tag) => {
+                  // Per i tag di tipo rating, mostra le stelline invece del valore
+                  let displayLabel;
+                  if (tag.type === "rating") {
+                    const stars = "★".repeat(parseInt(tag.label));
+                    displayLabel = `${stars} - ${tag.count} file`;
+                  } else {
+                    displayLabel = `${tag.label} - ${tag.count} file`;
+                  }
+
+                  return {
+                    value: tag.id.toString(),
+                    label: displayLabel,
+                  };
+                })}
               searchable
               clearable
               size="md"
@@ -758,6 +835,18 @@ export default function Home() {
 
           {selectedFile ? (
             <>
+              {/* Rating a stelle */}
+              <div style={{ marginBottom: "1rem" }}>
+                <Text size="sm" fw={500} mb="xs">
+                  Rating
+                </Text>
+                <Rating
+                  value={fileRating}
+                  onChange={handleRatingChange}
+                  size="lg"
+                />
+              </div>
+
               {/* Campo per aggiungere nuovo tag */}
               <div style={{ marginBottom: "1rem" }}>
                 <TextInput
